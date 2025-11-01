@@ -1,0 +1,44 @@
+name: Build Windows EXE + Setup
+
+on:
+  workflow_dispatch:   # elle tetikleme
+  push:
+    tags: ["v*"]       # tag atınca da tetikler (opsiyonel)
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pyinstaller-hooks-contrib
+
+      - name: PyInstaller onedir
+        run: pyinstaller --noconfirm --onedir --noconsole --name "DeneyUygulamasi" --collect-data psychopy --collect-data pyglet --collect-data wx --add-data "stimuli;stimuli" main.py
+
+      - name: Zip portable build
+        run: powershell Compress-Archive -Path dist\DeneyUygulamasi\* -DestinationPath dist\DeneyUygulamasi-win.zip
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Setup (.exe)
+        run: '"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss'
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            dist/DeneyUygulamasi-win.zip
+            output/DeneyUygulamasi-Setup.exe

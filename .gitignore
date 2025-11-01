@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+
+# Build
+build/
+dist/
+*.spec
+
+# Venv
+.venv/
+
+# Inno output
+output/
