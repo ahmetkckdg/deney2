@@ -1,13 +1,14 @@
 name: Build Windows EXE + Setup
 
 on:
-  workflow_dispatch:   # elle tetikleme
+  workflow_dispatch: {}
   push:
-    tags: ["v*"]       # tag atınca da tetikler (opsiyonel)
+    tags: ["v*"]
 
 jobs:
-  build:
+  windows-build:
     runs-on: windows-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -16,21 +17,37 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+          cache: "pip"
 
       - name: Install deps
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller pyinstaller-hooks-contrib
 
-      - name: PyInstaller onedir
-        run: pyinstaller --noconfirm --onedir --noconsole --name "DeneyUygulamasi" --collect-data psychopy --collect-data pyglet --collect-data wx --add-data "stimuli;stimuli" main.py
+      - name: PyInstaller (onedir)
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --onedir --noconsole `
+            --name "DeneyUygulamasi" `
+            --collect-data psychopy --collect-data pyglet --collect-data wx `
+            --collect-submodules psychopy.visual.backends `
+            --hidden-import psychopy.visual.backends.pygletbackend `
+            --hidden-import psychopy.visual.backends.glfwbackend `
+            --add-data "stimuli;stimuli" `
+            main.py
 
       - name: Zip portable build
-        run: powershell Compress-Archive -Path dist\DeneyUygulamasi\* -DestinationPath dist\DeneyUygulamasi-win.zip
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\DeneyUygulamasi\* `
+            -DestinationPath dist\DeneyUygulamasi-win.zip -Force
 
       - name: Install Inno Setup
-        run: choco install innosetup --no-progress -y
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
 
       - name: Build Setup (.exe)
         shell: pwsh

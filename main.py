@@ -1,5 +1,14 @@
 # main.py
 from psychopy import visual, core, event, gui
+# PsychoPy backend'lerini paketletmek için explicit import (PyInstaller için)
+try:
+    import psychopy.visual.backends.pygletbackend  # noqa: F401
+except Exception:
+    pass
+try:
+    import psychopy.visual.backends.glfwbackend  # noqa: F401
+except Exception:
+    pass
 import csv, os, glob, datetime, sys
 
 def resource_path(*parts):
@@ -133,7 +142,7 @@ def main():
     results_csv = os.path.join(DATA_DIR, f"{base}_sonuclar.csv")
 
     # Pencere
-    win = visual.Window(fullscr=FULLSCREEN, color=BG_COLOR, units='height')
+    win = visual.Window(fullscr=FULLSCREEN, color=BG_COLOR, units='height', winType='glfw')
     win.mouseVisible = False
 
     # ------------------ Onam ------------------
