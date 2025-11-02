@@ -1,6 +1,27 @@
 # main.py
-from psychopy import visual, core, event, gui
-import csv, os, glob, datetime, sys
+
+# --- EXE (--noconsole) kapanışında logging'in patlamasını engelle ---
+import sys, io, os, csv, glob, datetime
+
+class _DevNull(io.TextIOBase):
+    def write(self, s): return len(s or "")
+    def flush(self): pass
+
+# PyInstaller'da stdout/stderr None olabilir -> yazılabilir hedef ver
+if sys.stdout is None: sys.stdout = _DevNull()
+if sys.stderr is None: sys.stderr = _DevNull()
+# --------------------------------------------------------------------
+
+from psychopy import visual, core, event, gui, logging
+
+# Konsol loglarını kapat, stream'i garanti et
+try:
+    logging.console.setLevel(logging.CRITICAL + 1)
+    if getattr(logging.console, "stream", None) is None:
+        logging.console.stream = _DevNull()
+except Exception:
+    pass
+
 
 def resource_path(*parts):
     # PyInstaller onefile için gömülü kaynak yolu
@@ -9,6 +30,7 @@ def resource_path(*parts):
     else:
         base = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base, *parts)
+
 
 def get_data_dir():
     """
@@ -44,6 +66,28 @@ def get_data_dir():
     os.makedirs(path, exist_ok=True)
     return path
 
+
+def safe_exit(win=None, code=0):
+    """core.quit yerine güvenli çıkış; logging flush yazma hatalarını engeller."""
+    try:
+        if hasattr(logging, "console"):
+            if getattr(logging.console, "stream", None) is None:
+                logging.console.stream = _DevNull()
+            logging.console.setLevel(logging.CRITICAL + 1)
+            try:
+                logging.flush()
+            except Exception:
+                pass
+    except Exception:
+        pass
+    if win is not None:
+        try:
+            win.close()
+        except Exception:
+            pass
+    sys.exit(code)
+
+
 # ------------------ Ayarlar ------------------
 FULLSCREEN = True
 BG_COLOR = 'black'
@@ -60,8 +104,7 @@ FRIEND_KEYS = ['e','h']   # e=Evet, h=Hayır
 STIM_ROOT = resource_path('stimuli')
 DATA_DIR = get_data_dir()
 
-# Sorular (10 adet) — düzenleyebilirsin
-# 10'luk Likert soruları (1–7)
+# Sorular (10 adet)
 LIKERT_QUESTIONS = [
     "Bu kişi dışa dönük, sosyal, konuşkan biridir.",
     "Bu kişi eleştirel, tartışmacı biridir.",
@@ -75,14 +118,9 @@ LIKERT_QUESTIONS = [
     "Bu kişi düzenli, titiz biridir."
 ]
 
-# Ölçek metni (ekranda sorunun altında görünecek)
 LIKERT_SCALE_HINT = "1 = Hiç Katılmıyorum  …  7 = Tamamen Katılıyorum"
-
-# Arkadaşlık sorusu (11. soru)
 FRIENDSHIP_QUESTION = "Bu kişiyle arkadaş olmak ister misiniz? (Evet/Hayır)"
 
-
-# Onam metni
 CONSENT_TEXT = """Sayın Katılımcı,
 
 Bu araştırma Atılım Üniversitesi Klinik Psikoloji Yüksek Lisans Programı kapsamında Doç. Dr. Neşe Alkan danışmanlığında Mine Ayasulu tarafından yürütülmektedir. Araştırmanın amacı insanların Instagram'da paylaştığı görsellerin Beş Faktör Kişilik Özellikleri ile ne ölçüde örtüştüğünü ölçmeyi amaçlamaktadır. Bu ölçümü yaparken psikologlar ve psikolog olmayanlar, Instagram gönderilerini paylaşmayı kabul eden katılımcıları beş faktör kişilik analizine göre değerlendirecektir.
@@ -93,10 +131,7 @@ Test, özel hayatınıza müdahale edecek ya da psikolojik rahatsızlık yaratac
 
 [E] Onaylıyorum  |  [H] Onaylamıyorum"""
 
-# Likert yönerge metni
 LIKERT_INSTRUCTION = "Lütfen bir yanıt seçin (1–7). Boş bırakma yok."
-
-# Foto üst yazısı
 PHOTO_HINT = f"Fotoğraf en fazla {int(PHOTO_MAX_SEC)} sn gösterilecek. Geçmek için [{SKIP_KEY.upper()}]"
 
 LIKERT_LABELS = {
@@ -115,7 +150,6 @@ def ensure_dir(path):
         os.makedirs(path)
 
 def list_sets(stim_root):
-    # setXX klasörlerini sırala
     sets = sorted([d for d in glob.glob(os.path.join(stim_root, 'set*')) if os.path.isdir(d)])
     return sets
 
@@ -131,14 +165,15 @@ def draw_centered_text(win, text, height=0.06, pos=(0,0)):
     )
     stim.draw()
 
-def wait_key(key_list):
+def wait_key(win, key_list):
     while True:
         keys = event.waitKeys(keyList=key_list + [EXIT_KEY], timeStamped=True)
         for k, t in keys:
             if k == EXIT_KEY:
-                core.quit()
+                safe_exit(win)
             if k in key_list:
                 return k, t
+
 
 # ------------------ Başlat ------------------
 def main():
@@ -150,7 +185,7 @@ def main():
     if dlg.OK:
         participant = ok[0].strip() if ok and ok[0] else "anon"
     else:
-        core.quit()
+        safe_exit(None)
 
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     ensure_dir(DATA_DIR)
@@ -159,51 +194,44 @@ def main():
     base = f"{participant}_{timestamp}"
     results_csv = os.path.join(DATA_DIR, f"{base}_sonuclar.csv")
 
+    # CSV'yi oluştur ve başlığı bir kez yaz
+    with open(results_csv, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.writer(f)
+        w.writerow([
+            "participant","timestamp","phase",
+            "set_index","item_index","item_text",
+            "response_key","response_label","rt_sec"
+        ])
+
     # Pencere
     win = visual.Window(fullscr=FULLSCREEN, color=BG_COLOR, units='height')
     win.mouseVisible = False
 
     # ------------------ Onam ------------------
     event.clearEvents()
-    # vardı: draw_centered_text(win, CONSENT_TEXT, height=0.05)
     draw_centered_text(win, CONSENT_TEXT, height=0.025)
     win.flip()
-    key, t = wait_key(['e','h'])
+    key, t = wait_key(win, ['e','h'])
     consent_given = (key == 'e')
 
-    
+    # Onam kaydı
+    with open(results_csv, 'a', newline='', encoding='utf-8-sig') as f:
+        w = csv.writer(f)
+        w.writerow([participant, timestamp, "consent",
+                    "", "", "Consent",
+                    key, ("onay" if consent_given else "ret"), f"{t:.4f}"])
+    if not consent_given:
+        event.clearEvents()
+        draw_centered_text(win, "Onay verilmedi. Deney sonlandırılıyor.", height=0.05)
+        win.flip()
+        core.wait(2.0)
+        safe_exit(win)
 
     # ------------------ Setleri hazırla ------------------
     sets = list_sets(STIM_ROOT)
     if len(sets) < 10:
-        # Yine de mevcut kadar set ile devam eder; ama uyarı verelim.
         print(f"[Uyarı] Bulunan set sayısı: {len(sets)} (beklenen: 10)")
 
-    # CSV başlıkları
-    # başlık
-    with open(results_csv, 'w', newline='', encoding='utf-8-sig') as f:
-        w = csv.writer(f)
-        w.writerow([
-            "participant","timestamp","phase",        # consent / likert / friendship
-            "set_index","item_index",                 # set: 1..10, item: soruNo (Likert 1..10) ya da boş
-            "item_text",                              # soru metni (veya 'Consent' / 'Arkadaşlık')
-            "response_key","response_label","rt_sec"  # örn: 1..7 ve etiketi / E-H ve 'Evet/Hayır'
-        ])
-    # Onam kaydı
-    with open(results_csv, 'a', newline='', encoding='utf-8-sig') as f:
-        w = csv.writer(f)
-        w.writerow([
-            participant, timestamp, "consent",
-            "", "", "Consent",
-            key, ("onay" if consent_given else "ret"), f"{t:.4f}"
-        ])
-    if not consent_given:
-        win.flip()
-        draw_centered_text(win, "Onay verilmedi. Deney sonlandırılıyor.", height=0.05)
-        win.flip()
-        core.wait(2.0)
-        win.close()
-        core.quit()
     # ------------------ Deney Döngüsü ------------------
     total_sets = min(10, len(sets))  # 10 set
     timer = core.Clock()
@@ -226,8 +254,7 @@ def main():
                 win.flip()
                 keys = event.getKeys(keyList=[SKIP_KEY, EXIT_KEY])
                 if EXIT_KEY in keys:
-                    win.close()
-                    core.quit()
+                    safe_exit(win)
                 if SKIP_KEY in keys:
                     break
 
@@ -238,9 +265,8 @@ def main():
             draw_centered_text(win, LIKERT_INSTRUCTION, height=0.035, pos=(0, -0.05))
             draw_centered_text(win, LIKERT_SCALE_HINT, height=0.03, pos=(0, -0.12))
             win.flip()
-            resp_key, rt = wait_key(LIKERT_KEYS)
+            resp_key, rt = wait_key(win, LIKERT_KEYS)
 
-            # --- YAZ: kişi başı tek CSV ---
             with open(results_csv, 'a', newline='', encoding='utf-8-sig') as f:
                 w = csv.writer(f)
                 w.writerow([
@@ -248,15 +274,15 @@ def main():
                     si+1, qi, qtext,
                     resp_key, LIKERT_LABELS.get(resp_key, resp_key), f"{rt:.4f}"
                 ])
+
         # --- Arkadaşlık Sorusu (E/H) ---
         event.clearEvents()
         draw_centered_text(win, FRIENDSHIP_QUESTION, height=0.05, pos=(0, 0.05))
         draw_centered_text(win, "E: Evet | H: Hayır", height=0.035, pos=(0, -0.05))
         win.flip()
-        f_key, f_rt = wait_key(FRIEND_KEYS)
+        f_key, f_rt = wait_key(win, FRIEND_KEYS)
         friend_resp = "Evet" if f_key == 'e' else "Hayır"
 
-        # --- YAZ: kişi başı tek CSV ---
         with open(results_csv, 'a', newline='', encoding='utf-8-sig') as f:
             w = csv.writer(f)
             w.writerow([
@@ -264,13 +290,16 @@ def main():
                 si+1, "", "Arkadaşlık",
                 f_key, friend_resp, f"{f_rt:.4f}"
             ])
+
     # ------------------ Teşekkür ------------------
     event.clearEvents()
     draw_centered_text(win, "Teşekkür ederiz.\n\nDeney tamamlandı.", height=0.06)
     win.flip()
     core.wait(2.5)
-    win.close()
-    core.quit()
+
+    # Güvenli kapanış
+    safe_exit(win, 0)
+
 
 if __name__ == "__main__":
     main()
