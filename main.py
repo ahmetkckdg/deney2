@@ -1,14 +1,5 @@
 # main.py
 from psychopy import visual, core, event, gui
-# PsychoPy backend'lerini paketletmek için explicit import (PyInstaller için)
-try:
-    import psychopy.visual.backends.pygletbackend  # noqa: F401
-except Exception:
-    pass
-try:
-    import psychopy.visual.backends.glfwbackend  # noqa: F401
-except Exception:
-    pass
 import csv, os, glob, datetime, sys
 
 def resource_path(*parts):
@@ -142,7 +133,7 @@ def main():
     results_csv = os.path.join(DATA_DIR, f"{base}_sonuclar.csv")
 
     # Pencere
-    win = visual.Window(fullscr=FULLSCREEN, color=BG_COLOR, units='height', winType='glfw')
+    win = visual.Window(fullscr=FULLSCREEN, color=BG_COLOR, units='height')
     win.mouseVisible = False
 
     # ------------------ Onam ------------------
@@ -153,21 +144,7 @@ def main():
     key, t = wait_key(['e','h'])
     consent_given = (key == 'e')
 
-    # Onam kaydı
-    with open(results_csv, 'a', newline='', encoding='utf-8-sig') as f:
-        w = csv.writer(f)
-        w.writerow([
-            participant, timestamp, "consent",
-            "", "", "Consent",
-            key, ("onay" if consent_given else "ret"), f"{t:.4f}"
-        ])
-    if not consent_given:
-        win.flip()
-        draw_centered_text(win, "Onay verilmedi. Deney sonlandırılıyor.", height=0.05)
-        win.flip()
-        core.wait(2.0)
-        win.close()
-        core.quit()
+    
 
     # ------------------ Setleri hazırla ------------------
     sets = list_sets(STIM_ROOT)
@@ -185,6 +162,21 @@ def main():
             "item_text",                              # soru metni (veya 'Consent' / 'Arkadaşlık')
             "response_key","response_label","rt_sec"  # örn: 1..7 ve etiketi / E-H ve 'Evet/Hayır'
         ])
+    # Onam kaydı
+    with open(results_csv, 'a', newline='', encoding='utf-8-sig') as f:
+        w = csv.writer(f)
+        w.writerow([
+            participant, timestamp, "consent",
+            "", "", "Consent",
+            key, ("onay" if consent_given else "ret"), f"{t:.4f}"
+        ])
+    if not consent_given:
+        win.flip()
+        draw_centered_text(win, "Onay verilmedi. Deney sonlandırılıyor.", height=0.05)
+        win.flip()
+        core.wait(2.0)
+        win.close()
+        core.quit()
     # ------------------ Deney Döngüsü ------------------
     total_sets = min(10, len(sets))  # 10 set
     timer = core.Clock()

@@ -1,5 +1,14 @@
+# ---- PsychoPy deneyi için minimum ve stabil gereklilikler (Python 3.10) ----
+
+# Çekirdek
 psychopy==2025.1.1
 wxPython==4.2.3
+
+# Sayısal ve görüntü
 numpy
 scipy
 pillow
+
+# Pencere backend'leri
+pyglet<2        # macOS'ta pyglet 2.x Cocoa/NSTrackingArea hatası çıkarabiliyor
+glfw            # alternatif backend; Windows paketinde de dahil edeceğiz

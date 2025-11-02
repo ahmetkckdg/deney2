@@ -26,12 +26,18 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller pyinstaller-hooks-contrib
 
+      - name: Clean old build
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force dist, build -ErrorAction SilentlyContinue
+
       - name: PyInstaller (onedir)
         shell: pwsh
         run: |
           pyinstaller --noconfirm --onedir --noconsole `
             --name "DeneyUygulamasi" `
             --collect-data psychopy --collect-data pyglet --collect-data wx `
+            --collect-submodules psychopy.plugins `
             --collect-submodules psychopy.visual.backends `
             --hidden-import psychopy.visual.backends.pygletbackend `
             --hidden-import psychopy.visual.backends.glfwbackend `
@@ -62,4 +68,4 @@ jobs:
           name: windows-build
           path: |
             dist/DeneyUygulamasi-win.zip
-            output/DeneyUygulamasi-Setup.exe
+            output/DeneyUygulamasi-Setup-*.exe

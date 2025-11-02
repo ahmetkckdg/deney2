@@ -1,20 +1,22 @@
 [Setup]
+AppId={{0A1B2C3D-4E5F-6789-ABCD-0123456789AB}}
 AppName=Deney Uygulamasi
-AppVersion=1.0.0
-AppPublisher=Senin Adin
+AppVersion=1.0.2
+VersionInfoVersion=1.0.2
 DefaultDirName={userappdata}\DeneyUygulamasi
 DefaultGroupName=Deney Uygulamasi
-OutputBaseFilename=DeneyUygulamasi-Setup
+OutputBaseFilename=DeneyUygulamasi-Setup-1.0.2
 OutputDir=output
+CloseApplications=yes
+RestartApplications=no
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
-; SetupIconFile=icon.ico   ; (varsa aç)
+; SetupIconFile=icon.ico   ; varsa aç
 
 [Files]
-; PyInstaller onedir çıktısını komple kopyala:
 Source: "dist\DeneyUygulamasi\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
 
 [Icons]
