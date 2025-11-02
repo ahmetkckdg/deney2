@@ -38,7 +38,11 @@ jobs:
             --name "DeneyUygulamasi" `
             --collect-data psychopy --collect-data pyglet --collect-data wx `
             --collect-submodules psychopy.plugins `
+            --collect-submodules psychopy.visual `
             --collect-submodules psychopy.visual.backends `
+            --hidden-import psychopy.visual.line `
+            --hidden-import psychopy.visual.text `
+            --hidden-import psychopy.visual.image `
             --hidden-import psychopy.visual.backends.pygletbackend `
             --hidden-import psychopy.visual.backends.glfwbackend `
             --add-data "stimuli;stimuli" `
