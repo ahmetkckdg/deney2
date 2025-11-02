@@ -1,4 +1,4 @@
-name: Build Windows EXE + Setup
+name: Build Windows EXE + Setup (collect-all)
 
 on:
   workflow_dispatch: {}
@@ -31,20 +31,14 @@ jobs:
         run: |
           Remove-Item -Recurse -Force dist, build -ErrorAction SilentlyContinue
 
-      - name: PyInstaller (onedir)
+      - name: PyInstaller (onedir, collect-all)
         shell: pwsh
         run: |
           pyinstaller --noconfirm --onedir --noconsole `
             --name "DeneyUygulamasi" `
-            --collect-data psychopy --collect-data pyglet --collect-data wx `
-            --collect-submodules psychopy.plugins `
-            --collect-submodules psychopy.visual `
-            --collect-submodules psychopy.visual.backends `
-            --hidden-import psychopy.visual.line `
-            --hidden-import psychopy.visual.text `
-            --hidden-import psychopy.visual.image `
-            --hidden-import psychopy.visual.backends.pygletbackend `
-            --hidden-import psychopy.visual.backends.glfwbackend `
+            --collect-all psychopy `
+            --collect-all pyglet `
+            --collect-all wx `
             --add-data "stimuli;stimuli" `
             main.py
 
